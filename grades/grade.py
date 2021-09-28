@@ -21,16 +21,12 @@ from collections import defaultdict
 from os.path import expanduser
 
 #from get_ask import get_ask
-from get_ask_biol_109_september import get_ask
+#from get_ask_biol_109_september import get_ask
+from get_ask_biol_494_september import get_ask
 
 
 from params import Params
 
-try:
-    from penalties import Penalties
-except ImportError:
-    class Penalties:
-        PENALTIES: {}
 
 class Utils:
     '''
@@ -169,6 +165,7 @@ class Grades:
             random_list=None,
             optional=None,
             show_answer_when_already_graded=False,
+            projects_dir=None,
         ):
         self.dir = directory
         self.solutions_dir = solutions_dir
@@ -181,6 +178,7 @@ class Grades:
         self.random_list = random_list
         self.optional = set(optional) if optional else set()
         self.show_answer_when_already_graded = show_answer_when_already_graded
+        self.projects_dir = projects_dir,
 
         print (f'EXERCICE  DIR: {self.dir}')
         print (f'SOLUTIONS DIR: {self.solutions_dir}')
@@ -438,7 +436,7 @@ class Grades:
         pandas_df = []
 
         if not self.random_list is None:
-            required_list = get_ask(Params.GET_AM_FOR_GET_ASK(AM))
+            required_list = get_ask(Params.GET_AM_FOR_GET_ASK(AM), **Params.GET_ASK_EXTRA_PARAMS)
         else:
             required_list = None
 
@@ -478,6 +476,7 @@ class Grades:
 
         ret = Params.MAIL_PATTERN.format(
             GREETING=greeting,
+            COURSE_TITLE=Params.COURSE_TITLE,
             AM=AM,
             EXERCISES=exercises_mail,
             SUMMARY=summary,
@@ -595,7 +594,7 @@ class Grades:
         print ('Read: {} files'.format(len(self.filenames)))
 
     @staticmethod
-    def get_project_grades(projects_dir = 'projects'):
+    def get_project_grades(projects_dir):
         '''
         Get all projects
         '''
@@ -660,6 +659,7 @@ class Aggregator:
         ex = None,
         send_to_me = False,
         actually_send_mail = False,
+        projects_dir = None,
     ):
 
         self.excel_filename = excel_filename
@@ -667,6 +667,7 @@ class Aggregator:
         self.ex = ex
         self.send_to_me = send_to_me
         self.actually_send_mail = actually_send_mail
+        self.projects_dir = projects_dir
 
         self.get_all_dirs()
         self.get_all_grades()
@@ -687,14 +688,7 @@ class Aggregator:
     def get_all_dirs(self,):
 
         self.all_exercise_dirs = glob.glob('exercises?')
-        self.all_dirs = {
-            'exercises': [],
-            'final': {
-                'exercises': 'final',
-                'solutions': 'solutions_final',
-            },
-            'projects': 'projects',
-        }
+        self.all_dirs = Params.all_dirs
 
         for d in self.all_exercise_dirs:
 
@@ -761,7 +755,7 @@ class Aggregator:
             self.store_grades(grades, type_='final')   
 
         print ('Collecting project grades')
-        project_grades = Grades.get_project_grades()
+        project_grades = Grades.get_project_grades(self.projects_dir, )
         for project_grade in project_grades:
             for AM in project_grade['AMs']:
 
@@ -785,7 +779,10 @@ class Aggregator:
         for AM, grades in self.all_grades.items():
             c += 1
 
-            text = Params.START_AGGREGATE_MAIL.format(AM=AM)
+            text = Params.START_AGGREGATE_MAIL.format(
+                AM=AM, 
+                COURSE_TITLE=Params.COURSE_TITLE
+            )
 
             exercises_sum = 0
             exercises_count = 0
@@ -848,8 +845,8 @@ class Aggregator:
             rounded_grade = Aggregator.final_grade(decimal_grade)
             text += f'{Params.FINAL_ROUNDED_GRADE}: {rounded_grade}\n\n'
 
-            if AM in Penalties.PENALTIES:
-                rounded_grade = Penalties.PENALTIES[AM]
+            if AM in Params.PENALTIES:
+                rounded_grade = Params.PENALTIES[AM]
                 text += f'\n\nGrade After disciplinary actions: {rounded_grade}\n\n'
 
             text += Params.END_AGGREGATE_MAIL
@@ -943,112 +940,14 @@ class Aggregator:
 
 if __name__ == '__main__':
     '''
-    #GRADE
-    python grade.py --dir /Users/admin/BME_17/exercises1 --sol /Users/admin/BME_17/solutions1 --action grade --start 1 --end 25 --show_answer_when_already_graded 
-    
-    #SEND EMAIL FOR EXERCISES
-    python grade.py --dir /Users/admin/BME_17/exercises1 --sol /Users/admin/BME_17/solutions1  --action send_mail --start 1 --end 25
-    python grade.py --dir /Users/admin/BME_17/exercises1 --sol /Users/admin/BME_17/solutions1  --action send_mail --start 1 --end 25 --ex alkaios.lmp@gmail.com --actually_send_mail --send_to_me 
-    python grade.py --dir /Users/admin/BME_17/exercises1 --sol /Users/admin/BME_17/solutions1  --action send_mail --start 1 --end 25 --actually_send_mail  
-    python grade.py --dir /Users/admin/BME_17/exercises1 --sol /Users/admin/BME_17/solutions1  --action send_mail --start 1 --end 25 --actually_send_mail --ex jacobgavalas.bme.uoc@gmail.com
-    python grade.py --dir /Users/admin/BME_17/exercises1 --sol /Users/admin/BME_17/solutions1  --action send_mail --start 1 --end 25 --actually_send_mail --ex iropap94@gmail.com
 
-    #AGGREGATE
-    python grade.py --action aggregate --send_to_me --ex alkaios.lmp@gmail.com
-    python grade.py --action aggregate --ex letsosalexandros@gmail.com 
-    python grade.py --action aggregate --ex med12p1170012@med.uoc.gr
-    python grade.py --action aggregate --ex manthostr@gmail.com 
-    python grade.py --action aggregate  --ex manthostr@gmail.com  --actually_send_mail --send_to_me 
-    python grade.py --action aggregate  --ex alkaios.lmp@gmail.com  --actually_send_mail --send_to_me 
-    python grade.py --action aggregate  --actually_send_mail 
-
-    ====================
-    python grade.py --dir /Users/admin/biol-494/exercises/ --sol /Users/admin/biol-494/solutions --action grade
-    python grade.py --dir /Users/admin/biol-494/exercises/ --sol /Users/admin/biol-494/solutions --action send_mail
-    python grade.py --dir /Users/admin/biol-494/exercises/ --sol /Users/admin/biol-494/solutions --action send_mail --actually_send_mail
-    python grade.py --dir /Users/admin/biol-494/exercises/ --ex 3158 --action grade 
-    python grade.py --dir /Users/admin/biol-494/exercises/ --sol /Users/admin/biol-494/solutions --ex 2743 --action grade 
-    python grade.py --dir /Users/admin/biol-494/exercises/ --sol /Users/admin/biol-494/solutions --ex 2743 --action send_mail --actually_send_mail
-
-    # 2nd Round grade:
-    python grade.py --dir /Users/admin/biol-494/exercises2/ --sol /Users/admin/biol-494/solutions2 --action grade --start 21 --end 40 
-
-    # 2nd Round Send mail:
-    python grade.py --dir /Users/admin/biol-494/exercises2/ --sol /Users/admin/biol-494/solutions2 --ex 2743 --action send_mail --start 21 --end 40  
-    python grade.py --dir /Users/admin/biol-494/exercises2/ --sol /Users/admin/biol-494/solutions2 --ex 2743 --action send_mail --start 21 --end 40 --actually_send_mail  
-    python grade.py --dir /Users/admin/biol-494/exercises2/ --sol /Users/admin/biol-494/solutions2 --ex 3052 --action send_mail --start 21 --end 40 --actually_send_mail --send_to_me
-    python grade.py --dir /Users/admin/biol-494/exercises2/ --sol /Users/admin/biol-494/solutions2 --action send_mail --start 21 --end 40 --actually_send_mail  
-    python grade.py --dir /Users/admin/biol-494/exercises2/ --sol /Users/admin/biol-494/solutions2 --ex 3052 --action send_mail --start 21 --end 40 --actually_send_mail
-
-
-    python grade.py --dir /Users/admin/biol-494/exercises2/ --sol /Users/admin/biol-494/solutions2 --action send_mail --start 21 --end 40 --actually_send_mail 
-
-    python grade.py --dir /Users/admin/biol-494/exercises/ --sol /Users/admin/biol-494/solutions --ex 2743 --action grade 
-
-    python grade.py --dir /Users/admin/biol-494/exercises2/ --sol /Users/admin/biol-494/solutions2 --action grade
-
-    # 3rd Round
-    python grade.py --dir /Users/admin/biol-494/exercises3/ --sol /Users/admin/biol-494/solutions3 --action grade --start 41 --end 60 
-    python grade.py --dir /Users/admin/biol-494/exercises3/ --sol /Users/admin/biol-494/solutions3 --ex 3053 --action send_mail --start 41 --end 60 --send_to_me --actually_send_mail   
-    python grade.py --dir /Users/admin/biol-494/exercises3/ --sol /Users/admin/biol-494/solutions3  --action send_mail --start 41 --end 60 --actually_send_mail
-
-    # 4th Round 
-    python grade.py --dir /Users/admin/biol-494/exercises4/ --sol /Users/admin/biol-494/solutions4 --action grade --start 61 --end 80 
-    python grade.py --dir /Users/admin/biol-494/exercises4/ --sol /Users/admin/biol-494/solutions4 --action send_mail --ex 3168 --send_to_me --actually_send_mail --start 61 --end 80 
-    python grade.py --dir /Users/admin/biol-494/exercises4/ --sol /Users/admin/biol-494/solutions4 --action send_mail --ex 2729 --actually_send_mail --start 61 --end 80 
-    python grade.py --dir /Users/admin/biol-494/exercises4/ --sol /Users/admin/biol-494/solutions4 --action send_mail --ex 2913 --actually_send_mail --start 61 --end 80 
-    python grade.py --dir /Users/admin/biol-494/exercises4/ --sol /Users/admin/biol-494/solutions4 --action send_mail --ex 3125 --actually_send_mail --start 61 --end 80
-    python grade.py --dir /Users/admin/biol-494/exercises4/ --sol /Users/admin/biol-494/solutions4 --action send_mail --ex 2898 --actually_send_mail --start 61 --end 80
-    python grade.py --dir /Users/admin/biol-494/exercises4/ --sol /Users/admin/biol-494/solutions4 --action send_mail --ex 2871 --actually_send_mail --start 61 --end 80
-
-    # 5th Round
-    python grade.py --dir /Users/admin/biol-494/exercises5/ --sol /Users/admin/biol-494/solutions5 --action grade --start 81 --end 90  
-    python grade.py --dir /Users/admin/biol-494/exercises5/ --sol /Users/admin/biol-494/solutions5 --ex 2970  --action send_mail --send_to_me --actually_send_mail --start 81 --end 90
-    python grade.py --dir /Users/admin/biol-494/exercises5/ --sol /Users/admin/biol-494/solutions5 --action send_mail --actually_send_mail --start 81 --end 90  
-    python grade.py --dir /Users/admin/biol-494/exercises5/ --sol /Users/admin/biol-494/solutions5 --ex 2967  --action send_mail --actually_send_mail --start 81 --end 90  
-    python grade.py --dir /Users/admin/biol-494/exercises5/ --sol /Users/admin/biol-494/solutions5 --ex 3037  --action send_mail --actually_send_mail --start 81 --end 90  
-
-    # 6th Round 
-    python grade.py --dir /Users/admin/biol-494/exercises6/ --sol /Users/admin/biol-494/solutions6 --action grade --start 91 --end 100 --optional 94
-    python grade.py --dir /Users/admin/biol-494/exercises6/ --sol /Users/admin/biol-494/solutions6 --action grade --start 91 --end 100 --ex 2979 
-    python grade.py --dir /Users/admin/biol-494/exercises6/ --sol /Users/admin/biol-494/solutions6 --ex 2979  --action send_mail --start 91 --end 100  
-    python grade.py --dir /Users/admin/biol-494/exercises6/ --sol /Users/admin/biol-494/solutions6 --ex 2979  --action send_mail --actually_send_mail  --start 91 --end 100
-    python grade.py --dir /Users/admin/biol-494/exercises6/ --sol /Users/admin/biol-494/solutions6  --action send_mail  --start 91 --end 100 --optional 94 
-    python grade.py --dir /Users/admin/biol-494/exercises6/ --sol /Users/admin/biol-494/solutions6  --action send_mail  --start 91 --end 100 --optional 94 --actually_send_mail  
-    python grade.py --dir /Users/admin/biol-494/exercises6/ --sol /Users/admin/biol-494/solutions6 --ex 3103 --action send_mail  --start 91 --end 100 --optional 94 --actually_send_mail
-    python grade.py --dir /Users/admin/biol-494/exercises6/ --sol /Users/admin/biol-494/solutions6 --ex 3089 --action send_mail  --start 91 --end 100 --optional 94 --actually_send_mail
-    python grade.py --dir /Users/admin/biol-494/exercises6/ --sol /Users/admin/biol-494/solutions6 --ex 3052 --action send_mail  --start 91 --end 100 --optional 94 --actually_send_mail
-    python grade.py --dir /Users/admin/biol-494/exercises6/ --sol /Users/admin/biol-494/solutions6 --ex 3094 --action send_mail  --start 91 --end 100 --optional 94 --actually_send_mail
-    python grade.py --dir /Users/admin/biol-494/exercises6/ --sol /Users/admin/biol-494/solutions6 --ex 2871 --action send_mail  --start 91 --end 100 --optional 94 --actually_send_mail
-
-    # final
-    python grade.py --dir /Users/admin/biol-494/final/ --sol /Users/admin/biol-494/solutions_final --action grade --start 1 --end 100  
-    python grade.py --dir /Users/admin/biol-494/final/ --sol /Users/admin/biol-494/solutions_final --action grade --start 1 --end 100 --ex 2979
-    python grade.py --dir /Users/admin/biol-494/final/ --sol /Users/admin/biol-494/solutions_final --ex 2979  --action send_mail --random_list 10 --actually_send_mail --send_to_me --start 1 --end 100 
-    python grade.py --dir /Users/admin/biol-494/final/ --sol /Users/admin/biol-494/solutions_final --ex 2979  --action send_mail --random_list 10 --actually_send_mail --start 1 --end 100 
-    python grade.py --dir /Users/admin/biol-494/final/ --sol /Users/admin/biol-494/solutions_final --ex 3117  --action send_mail --random_list 10 --actually_send_mail --start 1 --end 100 --send_to_me
-    python grade.py --dir /Users/admin/biol-494/final/ --sol /Users/admin/biol-494/solutions_final   --action send_mail --random_list 10 --actually_send_mail --start 1 --end 100 
-
-    # Aggregate
-    python grade.py --action aggregate 
-    python grade.py --action aggregate --excel 494_ΒΙΟΛ-494.xlsx
-    python grade.py --action aggregate --excel 494_ΒΙΟΛ-494.xlsx --optional 94
-    python grade.py --action aggregate --excel 494_ΒΙΟΛ-494.xlsx --optional 94 --ex 2871 --send_to_me
-    python grade.py --action aggregate --excel ΒΙΟΛ-494_Ιούνιος_2021.xlsx --optional 94 
-
-    # BME-109 FINAL SEPTEMBER
-    python grade.py --action grade --dir /Users/admin/biol-109/september/ --sol /Users/admin/biol-109/september_sol/  --start 1 --end 100 
-    python grade.py  --dir /Users/admin/biol-109/september/ --sol /Users/admin/biol-109/september_sol/  --action send_mail --start 1 --end 100  --random_list 10  
-    python grade.py  --dir /Users/admin/biol-109/september/ --sol /Users/admin/biol-109/september_sol/  --action send_mail --actually_send_mail --send_to_me --start 1 --end 100  --random_list 10  --ex bio3490@edu.biology.uoc.gr 
-    python grade.py  --dir /Users/admin/biol-109/september/ --sol /Users/admin/biol-109/september_sol/  --action send_mail --actually_send_mail  --start 1 --end 100  --random_list 10
-
-    # BIOL-109 FINAL SEPTEMBER 
-    python grade.py --action grade --dir /Users/admin/biol-494/final_september/ --sol /Users/admin/biol-494/solutions_september --start 1 --end 100  
     '''
 
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("--profile", help="Nameo of parameters in profile")
     parser.add_argument("--dir", help="Directory with exercises")
+    parser.add_argument("--projects_dir", help="Directory with project")
     parser.add_argument("--sol", help="Directory with solutions")
     parser.add_argument("--ex", help="Examine only given ΑΜ")
     parser.add_argument("--action", help="What to do: grade")
@@ -1062,6 +961,8 @@ if __name__ == '__main__':
     parser.add_argument("--excel", help="Excel file with all students")
     args = parser.parse_args()
 
+    Params.set_profile(args.profile)
+
     if args.action == 'aggregate':
         a = Aggregator(
             excel_filename = args.excel,
@@ -1069,9 +970,14 @@ if __name__ == '__main__':
             ex=args.ex,
             send_to_me=args.send_to_me,
             actually_send_mail=args.actually_send_mail,
+            projects_dir=args.projects_dir,
         )
     else:
-        g = Grades(directory=args.dir, ex=args.ex, solutions_dir=args.sol, 
+        g = Grades(
+            directory=args.dir, 
+            ex=args.ex, 
+            solutions_dir=args.sol,
+            projects_dir=args.projects_dir, 
             action=args.action,
             actually_send_mail=args.actually_send_mail,
             send_to_me=args.send_to_me,
