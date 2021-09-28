@@ -20,7 +20,10 @@ from itertools import groupby
 from collections import defaultdict
 from os.path import expanduser
 
-from get_ask import get_ask
+#from get_ask import get_ask
+from get_ask_biol_109_september import get_ask
+
+
 from params import Params
 
 try:
@@ -136,7 +139,7 @@ class Grades:
     declarations = [
         'askhsh','Askhsh','ASKHSH','Askisi','askisi',
         '΄askhsh','ΆΣΚΗΣΗ','ΑΣΚΗΣΗ','ασκηση','άσκηση',
-        'Άσκηση','ασκιση', 'akshsh', 'Αskhsh', 'Askhsk', 
+        'Άσκηση:?', 'ασκιση', 'akshsh', 'Αskhsh', 'Askhsk', 
         'Απαντηση ασκησης', 'Απάντηση ασκησης', 'απαντηση ασκησης',
         'Task_', 'απαντηση ακσησης', 'απάντηση άσκησης',
         'this is the solution for ex.', r'-+ΑΣΚΗΣΗ',
@@ -145,10 +148,10 @@ class Grades:
         'askshsh', 'ασκ', '΄άσκηση', 'Asksh', 'Askhshh', 'asksi',
         'Ask', 'askkisi', 'aσκηση', 'ASkhsh', '΄Άσκηση', 'Akhsh',
         'Askhh', 'Askshsh', '΄΄Ασκηση', '΄΄Άσκηση', 'Άskisi', 'Αskisi',
-        '.+skisi',
+        '.+skisi', 'ASK', 'AΣΚΗΣΗ', r'ask\.',
 
         'Exercise', 'exercise', 'ex', 'exercise.', 'Ex', 'Ex.',
-        'excercise', 'exercice', 'EX', 'EX.'
+        'excercise', 'exercice', 'EX', 'EX.',
     ]
 
     ex_regexp = re.compile(r'^\s*#+\s*({})\s*_*(?P<ask>\d+)'.format('|'.join(declarations)))
@@ -435,7 +438,7 @@ class Grades:
         pandas_df = []
 
         if not self.random_list is None:
-            required_list = get_ask(AM)
+            required_list = get_ask(Params.GET_AM_FOR_GET_ASK(AM))
         else:
             required_list = None
 
@@ -529,9 +532,8 @@ class Grades:
             content += '\n' + line
 
         if exercise is None:
-            print (f'Could not find any exercise in file: {filename}')
-            print (text)
-            assert False
+            print (text)            
+            assert False, f'Could not find any exercise in file: {filename}'
 
         yield (exercise, content)
 
@@ -1035,7 +1037,13 @@ if __name__ == '__main__':
     python grade.py --action aggregate --excel ΒΙΟΛ-494_Ιούνιος_2021.xlsx --optional 94 
 
     # BME-109 FINAL SEPTEMBER
-    python grade.py --action grade --dir /Users/admin/biol-109/september/ --sol /Users/admin/biol-109/september_sol/  
+    python grade.py --action grade --dir /Users/admin/biol-109/september/ --sol /Users/admin/biol-109/september_sol/  --start 1 --end 100 
+    python grade.py  --dir /Users/admin/biol-109/september/ --sol /Users/admin/biol-109/september_sol/  --action send_mail --start 1 --end 100  --random_list 10  
+    python grade.py  --dir /Users/admin/biol-109/september/ --sol /Users/admin/biol-109/september_sol/  --action send_mail --actually_send_mail --send_to_me --start 1 --end 100  --random_list 10  --ex bio3490@edu.biology.uoc.gr 
+    python grade.py  --dir /Users/admin/biol-109/september/ --sol /Users/admin/biol-109/september_sol/  --action send_mail --actually_send_mail  --start 1 --end 100  --random_list 10
+
+    # BIOL-109 FINAL SEPTEMBER 
+    python grade.py --action grade --dir /Users/admin/biol-494/final_september/ --sol /Users/admin/biol-494/solutions_september --start 1 --end 100  
     '''
 
 
