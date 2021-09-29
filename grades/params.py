@@ -10,13 +10,13 @@ Hello,
 These are your grades for the exercises {START}-{END} in the course: 
 '''
 
-    GREETING_EXERCISES_SEMTEMBER_GREEK = '''
+    GREETING_EXERCISES_SEMTEMBER_GR = '''
 Γεια σας,
 
 Παρακάτω ακολουθούν οι βαθμοί σας στην εξέταση Σεπτεμβρίου στο μάθημα:
 '''
 
-    MAIL_PATTERN_EXERCISES_ENGLISH = '''
+    MAIL_PATTERN_EXERCISES_EN = '''
 {GREETING}
 
 {COURSE_TITLE}
@@ -38,7 +38,7 @@ Alexandros Kanterakis
 '''
 
 
-    MAIL_PATTERN_2 = '''
+    MAIL_PATTERN_EXERCISES_GR = '''
 {GREETING}
 
 {COURSE_TITLE}
@@ -60,7 +60,7 @@ Mail/ΑΜ: {AM}
 
 '''
 
-    MAIL_EXERCISE_PATTERN_1 = '''
+    MAIL_EXERCISE_PATTERN_EN = '''
 ================================
   Exercise: {EXERCISE}
 ================================
@@ -75,7 +75,7 @@ Grade: {GRADE}
 --------------------------------
 '''
 
-    MAIL_EXERCISE_PATTERN = '''
+    MAIL_EXERCISE_PATTERN_GR = '''
 ================================
   Άσκηση: {EXERCISE}
 ================================
@@ -93,18 +93,16 @@ Grade: {GRADE}
 
     MAIL_SUBJECT_1 = 'BME-17 - Grades for exercises {START}-{END}'
     MAIL_SUBJECT_2 = 'ΒΙΟΛ-109 - Βαθμός εξεταστικής Σεπτέμβριος 2021'
-    MAIL_SUBJECT = 'ΒΙΟΛ-494 - Βαθμός εξεταστικής Σεπτέμβριος 2021'
+    MAIL_SUBJECT_3 = 'ΒΙΟΛ-494 - Βαθμός εξεταστικής Σεπτέμβριος 2021'
 
-    SUBMIT_NOTHING_1 = 'You did not submit anything for this exercise'
-    SUBMIT_NOTHING = 'Δεν έστειλες κάτι για αυτή την άσκηση'
+    SUBMIT_NOTHING_EN = 'You did not submit anything for this exercise'
+    SUBMIT_NOTHING_GR = 'Δεν έστειλες κάτι για αυτή την άσκηση'
 
     AVERAGE_EXERCISES_EN = 'Average exercises grade' #  'Μέσος όρος ασκήσεων'
     AVERAGE_EXERCISES_GR = 'Μέσος όρος ασκήσεων' 
 
-
     PROJECT_GRADE_EN = "Project's Grade" # 
     PROJECT_GRADE_GR = "Βαθμός Project"
-
 
     FINAL_FLOAT_GRADE_EN = 'Final float grade' # 'Τελικός δεκαδικός βαθμός'
     FINAL_FLOAT_GRADE_GR = 'Τελικός δεκαδικός βαθμός'
@@ -113,11 +111,11 @@ Grade: {GRADE}
     FINAL_ROUNDED_GRADE_GR = 'Τελικός στρογγυλοποιημένος βαθμός'
 
 
-    FINAL_SUBJECT_1 = 'ΒΜΕ-17, Final Grade' # 'ΒΙΟΛ-494, Τελικός βαθμός'
-    FINAL_SUBJECT = 'ΒΙΟΛ-494, Τελικός βαθμός'
+    FINAL_SUBJECT_EN = '{LESSON_CODE}, Final Grade' # 'ΒΙΟΛ-494, Τελικός βαθμός'
+    FINAL_SUBJECT_GR = '{LESSON_CODE}, Τελικός βαθμός'
 
 
-    START_AGGREGATE_MAIL = '''
+    START_AGGREGATE_MAIL_EN = '''
 Hello, below is your detailed grade in the course:
 
 {COURSE_TITLE}
@@ -127,23 +125,23 @@ Mail: {AM}
 Exercises:
 '''
 
-    END_AGGREGATE_MAIL = '''
+    END_AGGREGATE_MAIL_EN = '''
 For questions please send email to kantale@ics.forth.gr
 
 Regards,
 Alexandros Kanterakis
 ''' #  # 'Χαιρετώ,\n' 'Αλέξανδρος Καντεράκης\n'
 
-    EXERCISE_1 = 'Exercise' # Άσκηση 
-    EXERCISE = 'Άσκηση'
+    EXERCISE_EN = 'Exercise' # Άσκηση 
+    EXERCISE_GR = 'Άσκηση'
 
     GRADE_EN = 'Grade' # Βαθμός 
     GRADE_GR = 'Βαθμός'
 
-    AVERAGE_1 = 'Average' # Μέσος όρος
-    AVERAGE = 'Μέσος όρος'
+    AVERAGE_EN = 'Average' # Μέσος όρος
+    AVERAGE_GR = 'Μέσος όρος'
 
-    WEIGHT_FUN = lambda *, exercises, final, project : (
+    WEIGHT_FUN_1 = lambda *, exercises, final, project : (
         (0.5 * exercises) + 
         (0.0 * final) + 
         (0.5 * project)
@@ -171,6 +169,8 @@ Alexandros Kanterakis
     def set_profile(cls, profile_name,):
 
         if profile_name == 'BME_17':
+
+            cls.LESSON_CODE = 'BME-17'
             cls.COURSE_TITLE = 'BME-17, Bio-Informatics' 
 
             cls.GRADE = cls.GRADE_EN
@@ -178,7 +178,13 @@ Alexandros Kanterakis
             cls.FINAL_FLOAT_GRADE = cls.FINAL_FLOAT_GRADE_EN
             cls.FINAL_ROUNDED_GRADE = cls.FINAL_ROUNDED_GRADE_EN
             cls.PROJECT_GRADE = cls.PROJECT_GRADE_EN
+            cls.START_AGGREGATE_MAIL = cls.START_AGGREGATE_MAIL_EN
+            cls.END_AGGREGATE_MAIL = cls.END_AGGREGATE_MAIL_EN
+            cls.FINAL_SUBJECT = cls.FINAL_SUBJECT_EN
+
             cls.TOTAL_EXERCISES = 25
+            cls.WEIGHT_FUN = cls.WEIGHT_FUN_1
+
 
             cls.all_dirs = {
                 'exercises': [
@@ -192,7 +198,7 @@ Alexandros Kanterakis
                     'exercises': 'final',
                     'solutions': 'solutions_final',
                 },
-                'projects': 'projects',
+                'projects': '/Users/admin/BME_17/projects/',
             }
             with open('/Users/admin/BME_17/penalties.json') as f:
                 cls.PENALTIES = json.load(f)

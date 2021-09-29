@@ -165,7 +165,6 @@ class Grades:
             random_list=None,
             optional=None,
             show_answer_when_already_graded=False,
-            projects_dir=None,
         ):
         self.dir = directory
         self.solutions_dir = solutions_dir
@@ -178,7 +177,6 @@ class Grades:
         self.random_list = random_list
         self.optional = set(optional) if optional else set()
         self.show_answer_when_already_graded = show_answer_when_already_graded
-        self.projects_dir = projects_dir,
 
         print (f'EXERCICE  DIR: {self.dir}')
         print (f'SOLUTIONS DIR: {self.solutions_dir}')
@@ -659,7 +657,6 @@ class Aggregator:
         ex = None,
         send_to_me = False,
         actually_send_mail = False,
-        projects_dir = None,
     ):
 
         self.excel_filename = excel_filename
@@ -667,7 +664,6 @@ class Aggregator:
         self.ex = ex
         self.send_to_me = send_to_me
         self.actually_send_mail = actually_send_mail
-        self.projects_dir = projects_dir
 
         self.get_all_dirs()
         self.get_all_grades()
@@ -755,7 +751,7 @@ class Aggregator:
             self.store_grades(grades, type_='final')   
 
         print ('Collecting project grades')
-        project_grades = Grades.get_project_grades(self.projects_dir, )
+        project_grades = Grades.get_project_grades(self.all_dirs['projects'], )
         for project_grade in project_grades:
             for AM in project_grade['AMs']:
 
@@ -869,7 +865,7 @@ class Aggregator:
                 mail_address = 'alexandros.kanterakis@gmail.com'
             else:
                 mail_address = Grades.create_mail_address(AM)
-            subject = Params.FINAL_SUBJECT #'ΒΙΟΛ-494, Τελικός βαθμός'
+            subject = Params.FINAL_SUBJECT.format(LESSON_CODE=Params.LESSON_CODE)
 
             if self.actually_send_mail:
                 self.mail.do_send_mail(
@@ -947,7 +943,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--profile", help="Nameo of parameters in profile")
     parser.add_argument("--dir", help="Directory with exercises")
-    parser.add_argument("--projects_dir", help="Directory with project")
     parser.add_argument("--sol", help="Directory with solutions")
     parser.add_argument("--ex", help="Examine only given ΑΜ")
     parser.add_argument("--action", help="What to do: grade")
@@ -970,14 +965,12 @@ if __name__ == '__main__':
             ex=args.ex,
             send_to_me=args.send_to_me,
             actually_send_mail=args.actually_send_mail,
-            projects_dir=args.projects_dir,
         )
     else:
         g = Grades(
             directory=args.dir, 
             ex=args.ex, 
             solutions_dir=args.sol,
-            projects_dir=args.projects_dir, 
             action=args.action,
             actually_send_mail=args.actually_send_mail,
             send_to_me=args.send_to_me,
