@@ -122,8 +122,16 @@ Hello, below is your detailed grade in the course:
 
 Mail: {AM}
 
-Exercises:
 '''
+    START_AGGREGATE_MAIL_GR = '''
+Γεια σας, παρακάτω ακολουθεί η λεπτομερής βαθμολογία σας στο μάθημα:
+
+{COURSE_TITLE}
+
+ΑΜ: {AM}
+
+'''
+
 
     END_AGGREGATE_MAIL_EN = '''
 For questions please send email to kantale@ics.forth.gr
@@ -132,8 +140,17 @@ Regards,
 Alexandros Kanterakis
 ''' #  # 'Χαιρετώ,\n' 'Αλέξανδρος Καντεράκης\n'
 
+    END_AGGREGATE_MAIL_GR = '''
+Γεια απορίες παρακαλώ στείλτε mail στο kantale@ics.forth.gr ή DM στο slack.
+
+Χαιρετώ,
+Αλέξανδρος Καντεράκης
+'''
+
     EXERCISE_EN = 'Exercise' # Άσκηση 
     EXERCISE_GR = 'Άσκηση'
+    EXERCISES_EN = 'Exercises'
+    EXERCISES_GR = 'Ασκήσεις'
 
     GRADE_EN = 'Grade' # Βαθμός 
     GRADE_GR = 'Βαθμός'
@@ -146,6 +163,8 @@ Alexandros Kanterakis
         (0.0 * final) + 
         (0.5 * project)
     )
+    FINAL_GRADE_FUN_1 = lambda *, exercise_average, final_average, project_average, decimal_grade :  f'0.5*{exercise_average} + 0.5*{project_average} = {decimal_grade}\n\n'
+
 
 
     WEIGHT_FUN_2 = lambda *, exercises, final, project : (
@@ -153,26 +172,29 @@ Alexandros Kanterakis
         (0.34 * final) + 
         (0.33 * project)
     )
+    FINAL_GRADE_FUN_2 = lambda *, exercise_average, final_average, project_average, decimal_grade :  f'0.33*{exercise_average} + 0.34*{final_average} + 0.33*{project_average} = {decimal_grade}\n\n'
 
-    #FINAL_GRADE_FUN = lambda *, exercise_average, final_average, project_average, decimal_grade :  f'0.33*{exercise_average} + 0.34*{final_average} + 0.33*{project_average} = {decimal_grade}\n\n'
-    FINAL_GRADE_FUN = lambda *, exercise_average, final_average, project_average, decimal_grade :  f'0.5*{exercise_average} + 0.5*{project_average} = {decimal_grade}\n\n'
+    WEIGHT_FUN_3 = lambda *, exercises, final, project : (
+        (0.0 * exercises) + 
+        (1.0 * final) + 
+        (0.0 * project)
+    )
+    FINAL_GRADE_FUN_3 = lambda *, exercise_average, final_average, project_average, decimal_grade :  f'1.0*{final_average} = {decimal_grade}\n\n'
+
 
     TOTAL_EXERCISES = 100 
+    TOTAL_FINAL = 10 # Denominator of final exercises sum
 
     GET_AM_FOR_GET_ASK = lambda x : int(re.search(r'bio(\d+)@edu\.biology\.uoc\.gr', x).group(1))
-    #GET_ASK_EXTRA_PARAMS = {}
-    GET_ASK_EXTRA_PARAMS = {'num': 20}
+    GET_ASK_EXTRA_PARAMS = {}
+    #GET_ASK_EXTRA_PARAMS = {'num': 20}
 
     PENALTIES = {} # {'student_AM': 0.0}
 
     @classmethod
     def set_profile(cls, profile_name,):
 
-        if profile_name == 'BME_17':
-
-            cls.LESSON_CODE = 'BME-17'
-            cls.COURSE_TITLE = 'BME-17, Bio-Informatics' 
-
+        if profile_name in ['BME_17']:
             cls.GRADE = cls.GRADE_EN
             cls.AVERAGE_EXERCISES = cls.AVERAGE_EXERCISES_EN
             cls.FINAL_FLOAT_GRADE = cls.FINAL_FLOAT_GRADE_EN
@@ -181,6 +203,27 @@ Alexandros Kanterakis
             cls.START_AGGREGATE_MAIL = cls.START_AGGREGATE_MAIL_EN
             cls.END_AGGREGATE_MAIL = cls.END_AGGREGATE_MAIL_EN
             cls.FINAL_SUBJECT = cls.FINAL_SUBJECT_EN
+            cls.EXERCISE = cls.EXERCISE_EN
+            cls.EXERCISES = cls.EXERCISES_EN
+        elif profile_name in ['BIOL_109', 'BIOL_494']:
+            cls.GRADE = cls.GRADE_GR
+            cls.AVERAGE_EXERCISES = cls.AVERAGE_EXERCISES_GR
+            cls.FINAL_FLOAT_GRADE = cls.FINAL_FLOAT_GRADE_GR
+            cls.FINAL_ROUNDED_GRADE = cls.FINAL_ROUNDED_GRADE_GR
+            cls.PROJECT_GRADE = cls.PROJECT_GRADE_GR
+            cls.START_AGGREGATE_MAIL = cls.START_AGGREGATE_MAIL_GR
+            cls.END_AGGREGATE_MAIL = cls.END_AGGREGATE_MAIL_GR
+            cls.FINAL_SUBJECT = cls.FINAL_SUBJECT_GR
+            cls.EXERCISE = cls.EXERCISE_GR
+            cls.EXERCISES = cls.EXERCISES_GR
+
+
+
+        if profile_name == 'BME_17':
+
+            cls.LESSON_CODE = 'BME-17'
+            cls.COURSE_TITLE = 'BME-17, Bio-Informatics' 
+
 
             cls.TOTAL_EXERCISES = 25
             cls.WEIGHT_FUN = cls.WEIGHT_FUN_1
@@ -203,10 +246,73 @@ Alexandros Kanterakis
             with open('/Users/admin/BME_17/penalties.json') as f:
                 cls.PENALTIES = json.load(f)
 
-        elif profile_name == 'BIOL-109':
+        elif profile_name == 'BIOL_109':
+            from get_ask_biol_109_september import get_ask
+            cls.get_ask = get_ask
+
+            cls.LESSON_CODE = 'ΒΙΟΛ-109'
             cls.COURSE_TITLE = 'ΒΙΟΛ-109 Χρήσεις του Η/Υ και Βιολογικές Βάσεις Δεδομένων'
-        elif profile_name == 'BIOL-494':
+
+            cls.WEIGHT_FUN = cls.WEIGHT_FUN_3
+            cls.FINAL_GRADE_FUN = cls.FINAL_GRADE_FUN_3
+            cls.TOTAL_EXERCISES = 0 # No exercises 
+
+            cls.all_dirs = {
+                'final': {
+                    'exercises' : '/Users/admin/biol-109/september',
+                    'solutions' : '/Users/admin/biol-109/september_sol',
+                }
+            }
+
+        elif profile_name == 'BIOL_494':
+            from get_ask_biol_494_september import get_ask
+            cls.get_ask = get_ask
+
+            cls.LESSON_CODE = 'ΒΙΟΛ-494'
             cls.COURSE_TITLE = 'ΒΙΟΛ-494 Εισαγωγή στον προγραμματισμό'
+
+            # Options for September 
+            cls.GET_ASK_EXTRA_PARAMS = {'num': 20}
+            cls.TOTAL_EXERCISES = 0 
+            cls.WEIGHT_FUN = cls.WEIGHT_FUN_3
+            cls.FINAL_GRADE_FUN = cls.FINAL_GRADE_FUN_3
+            cls.TOTAL_FINAL = 20
+
+
+            cls.all_dirs = {
+                'exercises_2': [
+                    {
+                        'exercises': '/Users/admin/biol-494/exercises1/',
+                        'solutions': '/Users/admin/biol-494/solutions1/',
+                    },
+                    {
+                        'exercises': '/Users/admin/biol-494/exercises2/',
+                        'solutions': '/Users/admin/biol-494/solutions2/',
+                    },
+                    {
+                        'exercises': '/Users/admin/biol-494/exercises3/',
+                        'solutions': '/Users/admin/biol-494/solutions3/',
+                    },
+                    {
+                        'exercises': '/Users/admin/biol-494/exercises4/',
+                        'solutions': '/Users/admin/biol-494/solutions4/',
+                    },
+                    {
+                        'exercises': '/Users/admin/biol-494/exercises5/',
+                        'solutions': '/Users/admin/biol-494/solutions5/',
+                    },
+                    {
+                        'exercises': '/Users/admin/biol-494/exercises6/',
+                        'solutions': '/Users/admin/biol-494/solutions6/',
+                    },
+
+                ],
+                'final': {
+                    'exercises': '/Users/admin/biol-494/final_september/',
+                    'solutions': '/Users/admin/biol-494/solutions_september/',
+                }
+            }
+
         else:
             raise Exception(f'Unknown Profile: {profile_name}')
 

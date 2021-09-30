@@ -22,7 +22,7 @@ from os.path import expanduser
 
 #from get_ask import get_ask
 #from get_ask_biol_109_september import get_ask
-from get_ask_biol_494_september import get_ask
+#from get_ask_biol_494_september import get_ask
 
 
 from params import Params
@@ -380,14 +380,6 @@ class Grades:
 
         return 'bio' + AM + '@edu.biology.uoc.gr'
 
-    @staticmethod
-    def create_AM_from_email(email):
-        m = re.fullmatch(r'bio(\d+)@edu\.biology\.uoc\.gr', email)
-        if m:
-            return m.group(1)
-
-        return email
-
     def send_mail(self,):
 
         total = len(self.all_answers)
@@ -434,7 +426,7 @@ class Grades:
         pandas_df = []
 
         if not self.random_list is None:
-            required_list = get_ask(Params.GET_AM_FOR_GET_ASK(AM), **Params.GET_ASK_EXTRA_PARAMS)
+            required_list = Params.get_ask(Params.GET_AM_FOR_GET_ASK(AM), **Params.GET_ASK_EXTRA_PARAMS)
         else:
             required_list = None
 
@@ -647,10 +639,6 @@ class Aggregator:
     Aggregates all grades
     '''
 
-    
-    TOTAL_FINAL = 10
-
-
     def __init__(self, 
         excel_filename = None, 
         optional=None,
@@ -722,16 +710,19 @@ class Aggregator:
         self.all_grades = {}
 
         # Get all exercise grades
-        for exercise_round in self.all_dirs['exercises']:
-            grades = Grades(
-                directory = exercise_round['exercises'],
-                solutions_dir = exercise_round['solutions'],
-                action = 'aggregate', 
-                ex = self.ex,
-            )
-            grades.collect_all_grades()
-            self.store_grades(grades, type_='exercises')
-            #print (grades.all_answers)  # {'1764': {1: {'answer': "\n# 'Ασκηση 1\n\ndef num(a):\n
+        if 'exercises' in self.all_dirs:
+            for exercise_round in self.all_dirs['exercises']:
+                grades = Grades(
+                    directory = exercise_round['exercises'],
+                    solutions_dir = exercise_round['solutions'],
+                    action = 'aggregate', 
+                    ex = self.ex,
+                )
+                grades.collect_all_grades()
+                self.store_grades(grades, type_='exercises')
+                #print (grades.all_answers)  # {'1764': {1: {'answer': "\n# 'Ασκηση 1\n\ndef num(a):\n
+        else:
+            print ('No exercises found')
 
         # If the final directory does not exist do not 
         # collect final grades
@@ -750,18 +741,21 @@ class Aggregator:
             grades.collect_all_grades()
             self.store_grades(grades, type_='final')   
 
-        print ('Collecting project grades')
-        project_grades = Grades.get_project_grades(self.all_dirs['projects'], )
-        for project_grade in project_grades:
-            for AM in project_grade['AMs']:
+        if 'projects' in self.all_dirs:
+            print ('Collecting project grades')
+            project_grades = Grades.get_project_grades(self.all_dirs['projects'], )
+            for project_grade in project_grades:
+                for AM in project_grade['AMs']:
 
-                if self.ex:
-                    if AM != self.ex:
-                        continue
+                    if self.ex:
+                        if AM != self.ex:
+                            continue
 
-                assert AM in self.all_grades, f'Could not find {AM} in total grades'
-                assert 'project' in self.all_grades[AM]
-                self.all_grades[AM]['project'] = project_grade['grade']
+                    assert AM in self.all_grades, f'Could not find {AM} in total grades'
+                    assert 'project' in self.all_grades[AM]
+                    self.all_grades[AM]['project'] = project_grade['grade']
+        else:
+            print ('No projects found')
         
     def average_grades(self,):
 
@@ -782,30 +776,47 @@ class Aggregator:
 
             exercises_sum = 0
             exercises_count = 0
-            for x in range(1, Params.TOTAL_EXERCISES+1):
-                text += f'{x}\t'
 
-                if x in grades['exercises']:
-                    g = grades['exercises'][x]
+            if Params.TOTAL_EXERCISES:
+                text += f'{Params.EXERCISES}:\n'
+                df_p = []
+                for x in range(1, Params.TOTAL_EXERCISES+1):
+                    #text += f'{x}\t\t'
 
-                    if pd.isna(g):
-                        text += f'---\n'
-                    elif x in self.optional and g == 0:
-                        text += f'---\n'
+                    if x in grades['exercises']:
+                        g = grades['exercises'][x]
+
+                        if pd.isna(g):
+                            #text += f'---\n'
+                            text_grade = f'---'
+                        elif x in self.optional and g == 0:
+                            #text += f'---\n'
+                            text_grade = f'---'
+                        else:
+                            #text += f'{g}\n'
+                            text_grade = f'{g}'
+                            exercises_sum += g
+                            exercises_count += 1                        
                     else:
-                        text += f'{g}\n'
-                        exercises_sum += g
-                        exercises_count += 1                        
-                else:
-                    if x in self.optional:
-                        text += f'---\n'
-                    else:
-                        text += '0\n'
-                        exercises_count += 1
+                        if x in self.optional:
+                            #text += f'---\n'
+                            text_grade = f'---'
+                        else:
+                            #text += '0\n'
+                            text_grade = '0'
+                            exercises_count += 1
 
-            exercise_average = exercises_sum/exercises_count
+                    df_p.append({Params.EXERCISE: x, Params.GRADE:text_grade})
+                df = pd.DataFrame(df_p)
+                text += df.to_string(index=False) + '\n'
+                text += f'\n{Params.AVERAGE_EXERCISES}: {exercises_sum}/{exercises_count}={exercise_average}\n\n'
 
-            text += f'\n{Params.AVERAGE_EXERCISES}: {exercises_sum}/{exercises_count}={exercise_average}\n\n'
+            if exercises_count:
+                exercise_average = exercises_sum/exercises_count
+            else:
+                exercise_average = 0.0
+
+            
 
 
             if self.has_final:
@@ -815,7 +826,7 @@ class Aggregator:
                     text += f'{k}\t{v}\n'
 
                 nominator = sum(grades['final'].values())
-                denominator = self.TOTAL_FINAL
+                denominator = Params.TOTAL_FINAL
                 final_average = nominator/denominator
 
                 text += f'Μέσος όρος τελικού: {nominator}/{denominator}={final_average}\n\n'
@@ -890,7 +901,6 @@ class Aggregator:
         new_column = 'Βαθ Εξετ 2',
         #AM_column = 'ΑΜ', # <-- Attention! this is Greek letters!
         AM_column = 'email', 
-        AM_column_is_email = True,
         ):
         if not self.excel_filename:
             print ('Excel filename not found!')
@@ -906,9 +916,6 @@ class Aggregator:
 
             new_dict = dict(record)
             AM = str(record[AM_column]) # this might be an email
-
-            if AM_column_is_email:
-                AM = Grades.create_AM_from_email(AM)
 
             if AM in self.lesson_grades:
                 new_dict[new_column] = str(self.lesson_grades[AM])
