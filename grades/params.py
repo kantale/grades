@@ -16,6 +16,15 @@ These are your grades for the exercises {START}-{END} in the course:
 Παρακάτω ακολουθούν οι βαθμοί σας στην εξέταση Σεπτεμβρίου στο μάθημα:
 '''
 
+    GREETING_EXERCISES_SEMTEMBER_EN = '''
+Hello,
+
+These are your grades for the September examination period in the course:
+'''
+
+
+
+
     MAIL_PATTERN_EXERCISES_EN = '''
 {GREETING}
 
@@ -94,6 +103,8 @@ Grade: {GRADE}
     MAIL_SUBJECT_1 = 'BME-17 - Grades for exercises {START}-{END}'
     MAIL_SUBJECT_2 = 'ΒΙΟΛ-109 - Βαθμός εξεταστικής Σεπτέμβριος 2021'
     MAIL_SUBJECT_3 = 'ΒΙΟΛ-494 - Βαθμός εξεταστικής Σεπτέμβριος 2021'
+    MAIL_SUBJECT_4 = 'BME-17 - Grades of September exams'
+    MAIL_SUBJECT_SEPTEMBER_EN = '{LESSON_CODE} - Grades of September exams'
 
     SUBMIT_NOTHING_EN = 'You did not submit anything for this exercise'
     SUBMIT_NOTHING_GR = 'Δεν έστειλες κάτι για αυτή την άσκηση'
@@ -205,6 +216,13 @@ Alexandros Kanterakis
             cls.FINAL_SUBJECT = cls.FINAL_SUBJECT_EN
             cls.EXERCISE = cls.EXERCISE_EN
             cls.EXERCISES = cls.EXERCISES_EN
+            cls.MAIL_EXERCISE_PATTERN = cls.MAIL_EXERCISE_PATTERN_EN
+            cls.SUBMIT_NOTHING = cls.SUBMIT_NOTHING_EN
+            cls.AVERAGE = cls.AVERAGE_EN
+            cls.GREETING = cls.GREETING_EXERCISES_SEMTEMBER_EN
+            cls.MAIL_PATTERN = cls.MAIL_PATTERN_EXERCISES_EN
+            cls.MAIL_SUBJECT = cls.MAIL_SUBJECT_SEPTEMBER_EN
+
         elif profile_name in ['BIOL_109', 'BIOL_494']:
             cls.GRADE = cls.GRADE_GR
             cls.AVERAGE_EXERCISES = cls.AVERAGE_EXERCISES_GR
@@ -216,7 +234,10 @@ Alexandros Kanterakis
             cls.FINAL_SUBJECT = cls.FINAL_SUBJECT_GR
             cls.EXERCISE = cls.EXERCISE_GR
             cls.EXERCISES = cls.EXERCISES_GR
-
+            cls.MAIL_EXERCISE_PATTERN = cls.MAIL_EXERCISE_PATTERN_GR
+            cls.SUBMIT_NOTHING = cls.SUBMIT_NOTHING_GR
+            cls.AVERAGE = cls.AVERAGE_GR
+            cls.MAIL_PATTERN = MAIL_PATTERN_EXERCISES_GR
 
 
         if profile_name == 'BME_17':
@@ -235,6 +256,11 @@ Alexandros Kanterakis
                     'exercises': '/Users/admin/BME_17/exercises1/', 
                     'solutions': '/Users/admin/BME_17/solutions1/',
                     },
+#                   {
+#                    'exercises': '/Users/admin/BME_17/september', 
+#                    'solutions': '/Users/admin/BME_17/september_solutions/',
+#                    },
+
                 ],
 
                 'final': {

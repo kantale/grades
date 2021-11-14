@@ -398,7 +398,11 @@ class Grades:
             if True:
                 self.mail.do_send_mail(
                     to=mail_address, 
-                    subject=Params.MAIL_SUBJECT.format(START=self.start, END=self.end), 
+                    subject=Params.MAIL_SUBJECT.format(
+                        START=self.start, 
+                        END=self.end,
+                        LESSON_CODE = Params.LESSON_CODE,
+                    ), 
                     #subject=self.MAIL_SUBJECT_2,  # Final
                     text=mail,
                     actually_send_mail=self.actually_send_mail,
