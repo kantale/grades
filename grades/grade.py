@@ -49,6 +49,14 @@ class Utils:
             if os.path.isdir(p):
                 yield p 
 
+    @staticmethod
+    def get_basename(path):
+        '''
+        'aa/cc/dd.ee' --> 'dd'
+        '''
+        last_path = os.path.split(path)[1]
+        return os.path.splitext(last_path)[0]
+
 
 class Mail:
 
@@ -86,7 +94,7 @@ class Mail:
 
 
 
-    def do_send_mail(self, to, subject, text, sleep=10, actually_send_mail=False):
+    def do_send_mail(self, to, subject, text, sleep=10, actually_send_mail=False, send_to_filename=False):
         from email.header import Header
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
@@ -113,10 +121,15 @@ class Mail:
 
         if actually_send_mail:
             self.server.sendmail(sender_email, receiver_email, message)
+            time.sleep(sleep)
+        elif send_to_filename:
+            with open(send_to_filename, 'a') as f:
+                f.write(text + '\n')
         else:
+            print (f'Subject: {subject}')
             print (text)
             #print (message)
-        time.sleep(sleep)
+        
         print ('Mail sent')
 
     def disconnect_from_gmail(self,):
@@ -144,10 +157,15 @@ class Grades:
         'askshsh', 'ασκ', '΄άσκηση', 'Asksh', 'Askhshh', 'asksi',
         'Ask', 'askkisi', 'aσκηση', 'ASkhsh', '΄Άσκηση', 'Akhsh',
         'Askhh', 'Askshsh', '΄΄Ασκηση', '΄΄Άσκηση', 'Άskisi', 'Αskisi',
-        '.+skisi', 'ASK', 'AΣΚΗΣΗ', r'ask\.',
+        '.+skisi', 'ASK', 'AΣΚΗΣΗ', r'ask\.', 'ASKISI', 'AKSHSH',
+        'Ashsh',
 
         'Exercise', 'exercise', 'ex', 'exercise.', 'Ex', 'Ex.',
         'excercise', 'exercice', 'EX', 'EX.',
+
+        'Project', 'P', 'PROJECT', 'project',
+
+        'Thema', 'THEMA', 'Θέμα', 'thema', 'ΘΕΜΑ', 'θΈΜΑ', 'Θεμα', 'θέμα',
     ]
 
     ex_regexp = re.compile(r'^\s*#+\s*({})\s*_*(?P<ask>\d+)'.format('|'.join(declarations)))
@@ -158,10 +176,13 @@ class Grades:
 
     def __init__(self, directory, solutions_dir, action, 
             ex=None, 
+            project = False, # Is this a project?
+            final = False, # Is this a final?
             actually_send_mail=False,
             start = 1,
             end = 20,
             send_to_me=False,
+            send_to_file=False,
             random_list=None,
             optional=None,
             show_answer_when_already_graded=False,
@@ -173,10 +194,13 @@ class Grades:
         self.end = end
         self.exercises_range = list(range(self.start, self.end+1))
         self.send_to_me = send_to_me
+        self.send_to_file = send_to_file
         self.all_anonymous_grades = [] # For plotting and statistics
         self.random_list = random_list
         self.optional = set(optional) if optional else set()
         self.show_answer_when_already_graded = show_answer_when_already_graded
+        self.this_is_project = project
+        self.this_is_final = final
 
         print (f'EXERCICE  DIR: {self.dir}')
         print (f'SOLUTIONS DIR: {self.solutions_dir}')
@@ -220,7 +244,7 @@ class Grades:
                 if re.match(self.GRADE_RE, x)
         ]
 
-        assert len(grades) == 1
+        assert len(grades) == 1, f'len(grades) -> {len(grades)}'
         assert grades[0] in list(range(0, 11)) + [-1] # -1 means: do not grade!
         if grades[0] == -1:
             return pd.NA
@@ -378,7 +402,7 @@ class Grades:
         if '@' in AM:
             return AM
 
-        return 'bio' + AM + '@edu.biology.uoc.gr'
+        return f'bio{AM}@edu.biology.uoc.gr'
 
     def send_mail(self,):
 
@@ -396,9 +420,17 @@ class Grades:
             #print(mail) # Comment this! 
 
             if True:
+
+                if self.this_is_project:
+                    mail_subject = Params.MAIL_PROJECT_SUBJECT
+                elif self.this_is_final:
+                    mail_subject = Params.MAIL_FINAL_SUBJECT
+                else:
+                    mail_subject = Params.MAIL_SUBJECT
+
                 self.mail.do_send_mail(
                     to=mail_address, 
-                    subject=Params.MAIL_SUBJECT.format(
+                    subject=mail_subject.format(
                         START=self.start, 
                         END=self.end,
                         LESSON_CODE = Params.LESSON_CODE,
@@ -406,6 +438,7 @@ class Grades:
                     #subject=self.MAIL_SUBJECT_2,  # Final
                     text=mail,
                     actually_send_mail=self.actually_send_mail,
+                    send_to_filename = 'mails.txt' if self.send_to_file else None,
                 )
             #a=1/0
 
@@ -416,7 +449,12 @@ class Grades:
         else:
             grade_str = f'{grade}/10'
 
-        return Params.MAIL_EXERCISE_PATTERN.format(
+        if self.this_is_project:
+            mail_exercise_pattern_f = Params.MAIL_PROJECT_PATTERN
+        else:
+            mail_exercise_pattern_f = Params.MAIL_EXERCISE_PATTERN
+
+        return mail_exercise_pattern_f.format(
             EXERCISE = exercise,
             SOLUTION = solution,
             COMMENT = comment,
@@ -459,13 +497,31 @@ class Grades:
             exercises_mail += self.create_exercise_mail(ASK, answer, comment, grade)
             pandas_df.append(grade_dics)
 
+        # Number of non_optional
+        non_optional = sum(not ASK in self.optional for ASK in self.exercises_range)
+
         pandas_df = pd.DataFrame(pandas_df)
         summary = pandas_df.to_string(index=False, na_rep='---')
         summary = summary.replace('<NA>', '  ---') # The above does not work!!!
-        average = pandas_df[Params.GRADE].mean(skipna=True)
+        
+        # There are two types of optional:
+        # 1. If you did it, you will be graded with it.  
+        # 2. BONUS: You will always get a gigher grade, if you did it. 
+        if False: # Type 1
+            average = pandas_df[Params.GRADE].mean(skipna=True) 
+        if True: # Type 2 (Bonus)
+            the_sum = pandas_df[Params.GRADE].sum(skipna=True)
+            average = the_sum / non_optional
+
         summary += f'\n\n{Params.AVERAGE}: {average}'
 
-        greeting = Params.GREETING.format(START=self.start, END=self.end) # Interim 
+        if self.this_is_project:
+            greeting_f = Params.GREETING_PROJECT
+        elif self.this_is_final:
+            greeting_f = Params.GREETING_FINAL
+        else:
+            greeting_f = Params.GREETING
+        greeting = greeting_f.format(START=self.start, END=self.end) # Interim 
         #greeting = self.GREETING_2 # Final
 
         ret = Params.MAIL_PATTERN.format(
@@ -504,6 +560,15 @@ class Grades:
         return self.PLAIN
 
 
+    def check_start_end(self, exercise):
+        if self.start and int(exercise) < self.start:
+            return False
+
+        if self.end and int(exercise) > self.end:
+            return False 
+
+        return True
+
     def iterate_exercises(self, text, filename=None):
 
         content = ''
@@ -518,7 +583,9 @@ class Grades:
                     print (line, '-->', {True: 'MATCHED', False: 'NO MATCH!'}[bool(m)])
             if m:
                 if exercise:
-                    yield (exercise, content)
+
+                    if self.check_start_end(exercise):
+                        yield (exercise, content)
                     content = ''
                 exercise = m.groupdict()['ask']
 
@@ -528,7 +595,8 @@ class Grades:
             print (text)            
             assert False, f'Could not find any exercise in file: {filename}'
 
-        yield (exercise, content)
+        if self.check_start_end(exercise):
+            yield (exercise, content)
 
     def get_exercises(self, filename):
         t = self.get_type(filename)
@@ -586,6 +654,14 @@ class Grades:
 
         self.filenames = glob.glob(os.path.join(self.dir, ex))
         print ('Read: {} files'.format(len(self.filenames)))
+
+        # Ignore filenames starting with _
+        filenames = [x for x in self.filenames if Utils.get_basename(x)[0] != '_']
+        if len(filenames) != self.filenames:
+            print (f'Ignoring {len(self.filenames)-len(filenames)} files')
+            self.filenames = filenames
+
+
 
     @staticmethod
     def get_project_grades(projects_dir):
@@ -944,27 +1020,289 @@ class Aggregator:
         new_excel.to_excel('grades.xlsx')
         print ('Generated: grades.xlsx')
 
-
-if __name__ == '__main__':
-    '''
-
-    '''
-
-
+def create_arg_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--profile", help="Nameo of parameters in profile")
+    parser.add_argument("--profile", help="Name of parameters in profile")
     parser.add_argument("--dir", help="Directory with exercises")
     parser.add_argument("--sol", help="Directory with solutions")
     parser.add_argument("--ex", help="Examine only given ΑΜ")
+    parser.add_argument("--project", action="store_true", help="This is a project")
+    parser.add_argument("--final", action="store_true", help="This is a final")
     parser.add_argument("--action", help="What to do: grade")
     parser.add_argument("--actually_send_mail", action="store_true")
     parser.add_argument("--send_to_me", action="store_true")
+    parser.add_argument("--send_to_file", action="store_true")
     parser.add_argument("--show_answer_when_already_graded", action="store_true")
     parser.add_argument("--start", type=int, help="Start from")
     parser.add_argument("--end", type=int, help="Start end")
     parser.add_argument("--random_list", type=int, help='Number of random exercises')
     parser.add_argument("--optional", nargs='*', type=int, help="Optional exercises")
     parser.add_argument("--excel", help="Excel file with all students")
+
+    return parser
+
+
+def aggregate_2():
+    import shlex
+    parser = create_arg_parser()
+
+    arg_lines = [
+        '--profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_1 --sol /Users/admin/biol-494/solutions_2022_1 --action send_mail  --start 1 --end 18 --send_to_file',
+        '--profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_2 --sol /Users/admin/biol-494/solutions_2022_2 --action send_mail  --start 19 --end 36 --send_to_file',
+        '--profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_3 --sol /Users/admin/biol-494/solutions_2022_3 --action send_mail --start 37 --end 54 --send_to_file',
+        '--profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_4 --sol /Users/admin/biol-494/solutions_2022_4 --action send_mail --start 55 --end 70 --send_to_file',
+        '--profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_5 --sol /Users/admin/biol-494/solutions_2022_5 --action send_mail --start 71 --end 90 --send_to_file',
+        '--profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_6 --sol /Users/admin/biol-494/solutions_2022_6 --action send_mail --start 91 --end 100 --send_to_file',
+        '--profile BIOL_494 --dir /Users/admin/biol-494/projects_2022 --sol /Users/admin/biol-494/projects_2022_solutions --action send_mail --start 1 --end 10  --project --send_to_file',
+        '--profile BIOL_494 --dir /Users/admin/biol-494/final_2022 --sol /Users/admin/biol-494/solutions_final_2022 --action send_mail --start 1 --end 11 --optional 11  --final --send_to_file',
+
+
+    ]
+
+
+    for arg_line in arg_lines:
+
+        args = parser.parse_args(shlex.split(arg_line))
+
+        Params.set_profile(args.profile)
+        g = Grades(
+                directory=args.dir, 
+                ex=args.ex, 
+                project=args.project,
+                final=args.final,
+                solutions_dir=args.sol,
+                action=args.action,
+                actually_send_mail=args.actually_send_mail,
+                send_to_me=args.send_to_me,
+                send_to_file=args.send_to_file,
+                start = args.start,
+                end = args.end,
+                random_list = args.random_list,
+                optional = args.optional,
+                show_answer_when_already_graded = args.show_answer_when_already_graded,
+        )
+
+
+    with open('mails.txt') as f:
+
+        grades = {}
+
+        for l in f:
+            #print (l.strip())
+            if re.search(r'Παρακάτω ακολουθούν οι βαθμοί σας στις ασκήσεις 1-11 του τελικού διαγωνίσματος στο μάθημα', l):
+                kind = 'final'
+            if re.search(r'Παρακάτω ακολουθούν οι βαθμοί σας στις ασκήσεις \d+-\d+ στο μάθημα', l):
+                kind = 'exercises'
+            if re.search(r'Παρακάτω ακολουθούν οι βαθμοί σας στα projects 1-10 στο μάθημα', l):
+                kind = 'projects'
+
+            s = re.search(r'Mail/ΑΜ: ([\w\@\.]+)', l)
+            if s:
+                AM = s.group(1)
+
+                assert kind
+                if not AM in grades:
+                    grades[AM] = {}
+
+                if not kind in grades[AM]:
+                    grades[AM][kind] = {}
+
+            if re.search(r'Περιληπτικά:', l):
+                for l2 in f:
+                    s = re.search(r'\s+(\d+)\s+([\d-]+)', l2)
+                    if s:
+                        ask = int(s.group(1))
+                        grade = s.group(2)
+                        if ask in grades[AM][kind]:
+                            print (f'Line: {l2}')
+                            print (f'Ask: {ask} seen twice in dictionary')
+                            assert False
+                        grades[AM][kind][ask] = grade
+
+
+                    s = re.search(r'Μέσος όρος: [\d\.]+', l2)
+                    if s:
+                        kind = None
+                        AM = None
+                        break
+
+        #print (grades)
+
+    # Create mail
+    text_f = '''
+Γεια σας,
+Ο τελικός σας βαθμός στο μάθημα ΒΙΟΛ-494, Εισαγωγή στον Προγραμματισμό, είναι: {final_grade}
+
+Παρακάτω ακολουθεί μία ανάλυση του συνολικού σας βαθμού:
+
+
+ΑΜ: {AM}
+
+Ασκήσεις:
+=========
+{exercises}
+
+Μέσος όρος ασκήσεων: {exercises_average}
+
+Projects:
+=========
+{projects}
+
+Μέσος όρος project: {projects_average}
+
+Τελική εξέταση:
+===============
+{final}
+
+Μέσος όρος (βαθμός) τελικούς: {final_average}
+
+Βαθμός μαθήματος:
+=================
+Μη στρογγυλοποιημένος βαθμός:
+(0.33*{exercises_average}) + (0.33*{projects_average}) + (0.34*{final_average}) = {final_grade_not_rounded}
+
+Στρογγυλοποιημένος τελικός βαθμός μαθήματος: {final_grade}
+
+Για απορίες παρακαλώ στείλτε μέιλ στο: kantale@ics.forth.gr ή με DM στο slack.
+
+Χαιρετώ,
+Αλέξανδρος Καντεράκης
+'''
+    for AM, d in grades.items():
+
+        for x in range(1,101):
+            if not x in d['exercises']:
+                d['exercises'][x] = 0
+            else:
+                 d['exercises'][x] = int(d['exercises'][x])
+
+
+        exercises = sorted(d['exercises'].items(), key=lambda x: x[0])
+        exercises = pd.DataFrame({
+            'Άσκηση': [x[0] for x in exercises],
+            'Βαθμός': [x[1] for x in exercises],
+        })
+        exercises_average = exercises['Βαθμός'].mean()
+        exercises = exercises.to_string(index=False, na_rep='---')
+
+        if not 'projects' in d:
+            d['projects'] = {}
+
+        for x in range(1,11):
+            if x in d['projects']:
+                d['projects'][x] = int(d['projects'][x])
+            else:
+                d['projects'][x] = 0
+
+        projects = sorted(d['projects'].items(), key=lambda x: x[0])
+        projects = pd.DataFrame({
+            'Project': [x[0] for x in projects],
+            'Βαθμός': [x[1] for x in projects],
+        })
+        projects_average = projects['Βαθμός'].mean()
+        projects = projects.to_string(index=False, na_rep='---')
+
+        if not 'final' in d:
+            d['final'] = {}
+
+        for x in range(1,12):
+            if x in d['final']:
+                if d['final'][x] == '---':
+                    d['final'][x] = 0
+                else:
+                    d['final'][x] = int(d['final'][x])
+            else:
+                d['final'][x] = 0
+
+        final = sorted(d['final'].items(), key=lambda x: x[0])
+        final = pd.DataFrame({
+            'Θέμα': [x[0] for x in final],
+            'Βαθμός': [x[1] for x in final],
+        })
+        final_average = final['Βαθμός'].sum() / 10.0
+        final = final.to_string(index=False, na_rep='---')
+        final = re.sub(r'11(\s+)\s0', r'11\1---', final)
+
+        final_grade_not_rounded = 0.33 * exercises_average + 0.33 * projects_average + 0.34 * final_average
+        final_grade = Aggregator.final_grade(final_grade_not_rounded)
+
+        text = text_f.format(
+            AM=AM,
+            exercises=exercises,
+            exercises_average = exercises_average,
+            projects=projects,
+            projects_average=projects_average,
+            final=final,
+            final_average=final_average,
+            final_grade_not_rounded=final_grade_not_rounded, 
+            final_grade=final_grade,
+        )
+
+        print (text)
+        #a=1/0
+
+if __name__ == '__main__':
+    '''
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_1 --sol /Users/admin/biol-494/solutions_2022_1 --action grade  --start 1 --end 18
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_1 --sol /Users/admin/biol-494/solutions_2022_1 --action send_mail  --start 1 --end 18 --ex 3235 --send_to_me --actually_send_mail
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_1 --sol /Users/admin/biol-494/solutions_2022_1 --action send_mail  --start 1 --end 18 --ex 3235 --actually_send_mail --ex 3051 
+
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_2 --sol /Users/admin/biol-494/solutions_2022_2 --action grade --start 19 --end 36 
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_2 --sol /Users/admin/biol-494/solutions_2022_2 --action send_mail  --start 19 --end 36 --ex 3235 --send_to_me --actually_send_mail
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_2 --sol /Users/admin/biol-494/solutions_2022_2 --action send_mail  --start 19 --end 36 --actually_send_mail
+
+
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_3 --sol /Users/admin/biol-494/solutions_2022_3 --action grade --start 37 --end 54
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_3 --sol /Users/admin/biol-494/solutions_2022_3 --action send_mail --start 37 --end 54  --ex 3235 --send_to_me --actually_send_mail
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_3 --sol /Users/admin/biol-494/solutions_2022_3 --action send_mail --start 37 --end 54 --actually_send_mail
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_3 --sol /Users/admin/biol-494/solutions_2022_3 --action send_mail --start 37 --end 54 --actually_send_mail --ex 3045 
+
+
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_4 --sol /Users/admin/biol-494/solutions_2022_4 --action grade --start 55 --end 70
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_4 --sol /Users/admin/biol-494/solutions_2022_4 --action send_mail --start 55 --end 70 --ex 3045 --send_to_me --actually_send_mail
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_4 --sol /Users/admin/biol-494/solutions_2022_4 --action send_mail --start 55 --end 70 --actually_send_mail 
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_4 --sol /Users/admin/biol-494/solutions_2022_4 --action send_mail --start 55 --end 70 --actually_send_mail --ex 3114 
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_4 --sol /Users/admin/biol-494/solutions_2022_4 --action send_mail --start 55 --end 70 --actually_send_mail --ex 3147 
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_4 --sol /Users/admin/biol-494/solutions_2022_4 --action send_mail --start 55 --end 70 --actually_send_mail --ex 3072
+
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_5 --sol /Users/admin/biol-494/solutions_2022_5 --action grade --start 71 --end 90
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_5 --sol /Users/admin/biol-494/solutions_2022_5 --action send_mail --start 71 --end 90 --ex 3235 --send_to_me --actually_send_mail
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_5 --sol /Users/admin/biol-494/solutions_2022_5 --action send_mail --start 71 --end 90 --actually_send_mail
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_5 --sol /Users/admin/biol-494/solutions_2022_5 --action send_mail --start 71 --end 90 --actually_send_mail --ex 3092 
+
+
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_6 --sol /Users/admin/biol-494/solutions_2022_6 --action grade --start 91 --end 100
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_6 --sol /Users/admin/biol-494/solutions_2022_6 --action send_mail --start 91 --end 100 --ex 3235 --send_to_me --actually_send_mail 
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_6 --sol /Users/admin/biol-494/solutions_2022_6 --action send_mail --start 91 --end 100 --ex 3115 
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_6 --sol /Users/admin/biol-494/solutions_2022_6 --action send_mail --start 91 --end 100 --actually_send_mail 
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_6 --sol /Users/admin/biol-494/solutions_2022_6 --action send_mail --start 91 --end 100 --actually_send_mail --ex 3115 
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/exercises_2022_6 --sol /Users/admin/biol-494/solutions_2022_6 --action send_mail --start 91 --end 100 --actually_send_mail --ex 3148
+
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/projects_2022 --sol /Users/admin/biol-494/projects_2022_solutions --action grade --start 1 --end 10 --ex 2936
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/projects_2022 --sol /Users/admin/biol-494/projects_2022_solutions --action send_mail --start 1 --end 10 --ex 2936  --project 
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/projects_2022 --sol /Users/admin/biol-494/projects_2022_solutions --action send_mail --start 1 --end 10 --ex 2936  --project --send_to_me --actually_send_mail  
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/projects_2022 --sol /Users/admin/biol-494/projects_2022_solutions --action send_mail --start 1 --end 10 --ex 2936  --project --actually_send_mail
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/projects_2022 --sol /Users/admin/biol-494/projects_2022_solutions --action grade --start 1 --end 10 
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/projects_2022 --sol /Users/admin/biol-494/projects_2022_solutions --action send_mail --start 1 --end 10 --project --actually_send_mail
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/projects_2022 --sol /Users/admin/biol-494/projects_2022_solutions --action send_mail --start 1 --end 10 --project --actually_send_mail --ex 3214 
+
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/final_2022 --sol /Users/admin/biol-494/solutions_final_2022 --action grade --start 1 --end 11 --ex 2936
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/final_2022 --sol /Users/admin/biol-494/solutions_final_2022 --action send_mail --start 1 --end 10 --ex 2936 --final
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/final_2022 --sol /Users/admin/biol-494/solutions_final_2022 --action send_mail --start 1 --end 10 --ex 2936 --final --send_to_me --actually_send_mail  
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/final_2022 --sol /Users/admin/biol-494/solutions_final_2022 --action send_mail --start 1 --end 10 --ex 2936 --final  --actually_send_mail  
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/final_2022 --sol /Users/admin/biol-494/solutions_final_2022 --action grade --start 1 --end 11
+
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/final_2022 --sol /Users/admin/biol-494/solutions_final_2022 --action send_mail --start 1 --end 11 --optional 11  --final
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/final_2022 --sol /Users/admin/biol-494/solutions_final_2022 --action send_mail --start 1 --end 11 --optional 11  --final --ex 2936 --send_to_me --actually_send_mail  
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/final_2022 --sol /Users/admin/biol-494/solutions_final_2022 --action send_mail --start 1 --end 11 --optional 11  --final --actually_send_mail  
+    p3 grade.py --profile BIOL_494 --dir /Users/admin/biol-494/final_2022 --sol /Users/admin/biol-494/solutions_final_2022 --action send_mail --start 1 --end 11 --optional 11  --final --actually_send_mail  --ex 3127 
+    '''
+
+    if True:
+        aggregate_2()
+        a=1/0
+
+    parser = create_arg_parser()
     args = parser.parse_args()
 
     Params.set_profile(args.profile)
@@ -981,6 +1319,8 @@ if __name__ == '__main__':
         g = Grades(
             directory=args.dir, 
             ex=args.ex, 
+            project=args.project,
+            final=args.final,
             solutions_dir=args.sol,
             action=args.action,
             actually_send_mail=args.actually_send_mail,
@@ -992,3 +1332,4 @@ if __name__ == '__main__':
             show_answer_when_already_graded = args.show_answer_when_already_graded,
         )
     
+
